@@ -2,6 +2,7 @@ import os
 from typing import Dict, Any
 
 from .exceptions import ProviderError
+from .providers.gemini import GeminiProvider, GeminiEmbeddingProvider
 from .strategies.wrapper import JSONWrapper, MDWrapper
 from .providers.ollama import OllamaProvider, OllamaEmbeddingProvider
 from .providers.openai import OpenAIProvider, OpenAIEmbeddingProvider
@@ -18,10 +19,14 @@ class AgentManager:
                 self.strategy = JSONWrapper()
         self.model = model
 
-    async def _get_provider(self, **kwargs: Any) -> OllamaProvider | OpenAIProvider:
+    async def _get_provider(self, **kwargs: Any) -> OllamaProvider | OpenAIProvider | GeminiProvider:
+        api_key = kwargs.get("gemini_api_key", os.getenv("GEMINI_API_KEY"))
+        if api_key:
+          return GeminiProvider(api_key=api_key)
+
         api_key = kwargs.get("openai_api_key", os.getenv("OPENAI_API_KEY"))
         if api_key:
-            return OpenAIProvider(api_key=api_key)
+          return OpenAIProvider(api_key=api_key)
 
         model = kwargs.get("model", self.model)
         installed_ollama_models = await OllamaProvider.get_installed_models()
@@ -45,10 +50,13 @@ class EmbeddingManager:
 
     async def _get_embedding_provider(
         self, **kwargs: Any
-    ) -> OllamaEmbeddingProvider | OpenAIEmbeddingProvider:
+    ) -> OllamaEmbeddingProvider | OpenAIEmbeddingProvider | GeminiEmbeddingProvider:
+        api_key = kwargs.get("gemini_api_key", os.getenv("GEMINI_API_KEY"))
+        if api_key:
+          return GeminiEmbeddingProvider(api_key=api_key)
         api_key = kwargs.get("openai_api_key", os.getenv("OPENAI_API_KEY"))
         if api_key:
-            return OpenAIEmbeddingProvider(api_key=api_key)
+          return OpenAIEmbeddingProvider(api_key=api_key)
         model = kwargs.get("embedding_model", self._model)
         installed_ollama_models = await OllamaProvider.get_installed_models()
         if model not in installed_ollama_models:

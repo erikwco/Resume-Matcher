@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 #
 # setup.sh - cross-platform setup for Resume Matcher
@@ -21,9 +20,9 @@ IFS=$'\n\t'
 #–– Detect OS for compatibility ––#
 OS="$(uname -s)"
 case "$OS" in
-  Linux*)   OS_TYPE="Linux" ;;
-  Darwin*)  OS_TYPE="macOS" ;;
-  *)        OS_TYPE="$OS" ;;
+Linux*) OS_TYPE="Linux" ;;
+Darwin*) OS_TYPE="macOS" ;;
+*) OS_TYPE="$OS" ;;
 esac
 
 #–– CLI help ––#
@@ -54,16 +53,19 @@ elif [[ "${1:-}" == "--start-dev" ]]; then
 fi
 
 #–– Logging helpers ––#
-info()    { echo -e "ℹ  $*"; }
+info() { echo -e "ℹ  $*"; }
 success() { echo -e "✅ $*"; }
-error()   { echo -e "❌ $*" >&2; exit 1; }
+error() {
+  echo -e "❌ $*" >&2
+  exit 1
+}
 
 info "Detected operating system: $OS_TYPE"
 
 #–– 1. Prerequisite checks ––#
 check_cmd() {
   local cmd=$1
-  if ! command -v "$cmd" &> /dev/null; then
+  if ! command -v "$cmd" &>/dev/null; then
     error "$cmd is not installed. Please install it and retry."
   fi
 }
@@ -72,7 +74,7 @@ check_node_version() {
   local min_major=18
   local ver
   ver=$(node --version | sed 's/^v\([0-9]*\).*/\1/')
-  if (( ver < min_major )); then
+  if ((ver < min_major)); then
     error "Node.js v${min_major}+ is required (found v$(node --version))."
   fi
 }
@@ -83,7 +85,7 @@ check_node_version
 check_cmd npm
 check_cmd python3
 
-if ! command -v pip3 &> /dev/null; then
+if ! command -v pip3 &>/dev/null; then
   if [[ "$OS_TYPE" == "Linux" && -x "$(command -v apt-get)" ]]; then
     info "pip3 not found; installing via apt-get…"
     sudo apt-get update && sudo apt-get install -y python3-pip || error "Failed to install python3-pip"
@@ -99,7 +101,7 @@ check_cmd pip3
 success "pip3 is available"
 
 # ensure uv
-if ! command -v uv &> /dev/null; then
+if ! command -v uv &>/dev/null; then
   info "uv not found; installing via Astral.sh…"
   curl -LsSf https://astral.sh/uv/install.sh | sh
   export PATH="$HOME/.local/bin:$PATH"
@@ -108,24 +110,30 @@ check_cmd uv
 success "All prerequisites satisfied."
 
 #–– 2. Ollama & model setup ––#
-info "Checking Ollama installation…"
-if ! command -v ollama &> /dev/null; then
-  info "ollama not found; installing…"
-  if [[ "$OS_TYPE" == "macOS" ]]; then
-    brew install ollama || error "Failed to install Ollama via Homebrew"
-  else
-    curl -LsSf https://ollama.com/install.sh | sh || error "Failed to install Ollama"
-    export PATH="$HOME/.local/bin:$PATH"
-  fi
-  success "Ollama installed"
-fi
-
-if ! ollama list | grep -q 'gemma3:4b'; then
-  info "Pulling gemma3:4b model…"
-  ollama pull gemma3:4b || error "Failed to pull gemma3:4b"
-  success "gemma3:4b model ready"
+# Skip Ollama if API keys are available
+if [[ -n "${GEMINI_API_KEY:-}" || -n "${OPENAI_API_KEY:-}" ]]; then
+  info "API key detected (GEMINI_API_KEY or OPENAI_API_KEY) - skipping Ollama installation"
+  success "Using cloud AI provider instead of local Ollama"
 else
-  info "gemma3:4b model already present—skipping"
+  info "No API keys found - setting up Ollama for local AI…"
+  if ! command -v ollama &>/dev/null; then
+    info "ollama not found; installing…"
+    if [[ "$OS_TYPE" == "macOS" ]]; then
+      brew install ollama || error "Failed to install Ollama via Homebrew"
+    else
+      curl -LsSf https://ollama.com/install.sh | sh || error "Failed to install Ollama"
+      export PATH="$HOME/.local/bin:$PATH"
+    fi
+    success "Ollama installed"
+  fi
+
+  if ! ollama list | grep -q 'gemma3:4b'; then
+    info "Pulling gemma3:4b model…"
+    ollama pull gemma3:4b || error "Failed to pull gemma3:4b"
+    success "gemma3:4b model ready"
+  else
+    info "gemma3:4b model already present—skipping"
+  fi
 fi
 
 #–– 3. Bootstrap root .env ––#
